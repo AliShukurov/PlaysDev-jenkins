@@ -1,12 +1,21 @@
 pipeline {
-    agent any
+    agent {
+        label 'host2' 
+    }
 
     stages {
+        stage('Clone Git repository') {
+            steps {
+                git 'https://github.com/AliShukurov/PlaysDev-task18.git' // замените на URL вашего репозитория Git
+            }
+        }
+
         stage('Build Docker image') {
             steps {
                 sh 'docker-compose build'
             }
         }
+
         stage('Push Docker image') {
             steps {
                 script {
@@ -25,32 +34,12 @@ pipeline {
             }
         }
 
-        stage('Delete all images, networks and containers if exists'){
-            agent {
-                    label 'ubuntu'
-            }
+        stage('Run Ansible playbook') {
             steps {
                 script {
-        
-                    sh 'docker rm -f $(docker ps -aq) || true'
-
-                    sh 'docker network ls --format "{{.Name}}" | grep -vE "^(bridge|host|none)$" | xargs -r docker network rm'
-
-                    sh 'docker images -q | xargs -r docker rmi -f'
-                }
-            }
-        }
-      
-        stage('Creating network, run docker containers') {
-            agent {
-                label 'ubuntu'
-            }
-            steps {
-                script{
-
-                    sh 'docker network create my_network'
-                    sh 'docker run -d -p 8080:80 --name apache --network=my_network alishukurov/nginx-app-t15:latest'
-                    sh 'docker run -d -p 80:80 --name nginx --network=my_network alishukurov/apache-app-t15:latest'
+                    withCredentials([sshUserPrivateKey(credentialsId: 'SSH-for-host3', keyFileVariable: 'SSH_KEY')]) {
+                        sh 'ansible-playbook /etc/ansible/ansible_host3_playbook.yml' 
+                    }
                 }
             }
         }
